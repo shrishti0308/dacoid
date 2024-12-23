@@ -29,9 +29,17 @@ export default function EventModal({ isOpen, onClose, onSave, event, selectedDat
       setDescription(event.description || '')
       setType(event.type)
     } else if (selectedDate) {
-      const dateString = selectedDate.toISOString().split('T')[0]
-      setStartTime(`${dateString}T09:00`)
-      setEndTime(`${dateString}T10:00`)
+      const startDate = new Date(selectedDate)
+      startDate.setTime(new Date().getTime())
+
+      const startDateString = startDate.toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+      const startDateTime = `${startDateString.slice(0, 10)}T${startDateString.slice(12, 17)}`
+
+      const endDateString = new Date(new Date(startDateTime).getTime() + 60 * 60 * 1000).toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+      const endDateTime = `${endDateString.slice(0, 10)}T${endDateString.slice(12, 17)}`
+
+      setStartTime(startDateTime)
+      setEndTime(endDateTime)
       setName('')
       setDescription('')
       setType('other')
