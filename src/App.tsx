@@ -7,6 +7,7 @@ import Calendar from './components/Calendar'
 import DayTimeline from './components/DayTimeline'
 import EventDetailsModal from './components/EventDetailsModal'
 import EventModal from './components/EventModal'
+import TimeConfirmationModal from './components/TimeConfirmationModal'
 import { Event } from './types/event'
 
 export default function App() {
@@ -15,7 +16,10 @@ export default function App() {
   const [events, setEvents] = useState<Event[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [isTimeConfirmationModalOpen, setIsTimeConfirmationModalOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<Event | null>(null)
+  const [draggedEvent, setDraggedEvent] = useState<Event | null>(null)
+  const [newEventDate, setNewEventDate] = useState<Date | null>(null)
 
   useEffect(() => {
     const storedEvents = localStorage.getItem('events')
@@ -42,7 +46,11 @@ export default function App() {
   }
 
   const handleEventClick = (event: Event) => {
-    setEditingEvent(event)
+    setEditingEvent({
+      ...event,
+      startTime: new Date(event.startTime).toISOString().slice(0, 16),
+      endTime: new Date(event.endTime).toISOString().slice(0, 16)
+    })
     setIsDetailsModalOpen(true)
   }
 
@@ -66,40 +74,29 @@ export default function App() {
   const handleEventDrop = (result: any) => {
     if (!result.destination) return
 
-    const updatedEvents = Array.from(events)
-    const [reorderedEvent] = updatedEvents.splice(result.source.index, 1)
+    const draggedEventId = result.draggableId
+    const newDate = new Date(result.destination.droppableId)
+    const draggedEvent = events.find(e => e.id === draggedEventId)
 
-    if (result.type === "EVENT") {
-      // Dragging within the day timeline
-      const draggedMinutes = Math.round((result.destination.index - result.source.index) * 15)
-      const newStartTime = new Date(reorderedEvent.startTime)
-      newStartTime.setMinutes(newStartTime.getMinutes() + draggedMinutes)
-      const newEndTime = new Date(reorderedEvent.endTime)
-      newEndTime.setMinutes(newEndTime.getMinutes() + draggedMinutes)
-
-      const updatedEvent = {
-        ...reorderedEvent,
-        startTime: newStartTime.toISOString(),
-        endTime: newEndTime.toISOString(),
-      }
-
-      updatedEvents.splice(result.destination.index, 0, updatedEvent)
-    } else {
-      // Dragging between days in the calendar
-      const newStartDate = new Date(result.destination.droppableId)
-      const oldStartDate = new Date(reorderedEvent.startTime)
-      const timeDiff = newStartDate.getTime() - oldStartDate.getTime()
-
-      const updatedEvent = {
-        ...reorderedEvent,
-        startTime: new Date(oldStartDate.getTime() + timeDiff).toISOString(),
-        endTime: new Date(new Date(reorderedEvent.endTime).getTime() + timeDiff).toISOString(),
-      }
-
-      updatedEvents.splice(result.destination.index, 0, updatedEvent)
+    if (draggedEvent) {
+      setDraggedEvent(draggedEvent)
+      setNewEventDate(newDate)
+      setIsTimeConfirmationModalOpen(true)
     }
+  }
 
-    setEvents(updatedEvents)
+  const handleTimeConfirmation = (newStartTime: string, newEndTime: string) => {
+    if (draggedEvent && newEventDate) {
+      const updatedEvent = {
+        ...draggedEvent,
+        startTime: newStartTime,
+        endTime: newEndTime
+      }
+      setEvents(events.map(e => e.id === draggedEvent.id ? updatedEvent : e))
+      setIsTimeConfirmationModalOpen(false)
+      setDraggedEvent(null)
+      setNewEventDate(null)
+    }
   }
 
   return (
@@ -126,7 +123,6 @@ export default function App() {
             date={selectedDate}
             events={events.filter(event => new Date(event.startTime).toDateString() === selectedDate.toDateString())}
             onEventClick={handleEventClick}
-            onEventDrop={handleEventDrop}
             onDateChange={setSelectedDate}
           />
         </div>
@@ -144,6 +140,13 @@ export default function App() {
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
         event={editingEvent}
+      />
+      <TimeConfirmationModal
+        isOpen={isTimeConfirmationModalOpen}
+        onClose={() => setIsTimeConfirmationModalOpen(false)}
+        onConfirm={handleTimeConfirmation}
+        event={draggedEvent}
+        newDate={newEventDate}
       />
     </div>
   )
