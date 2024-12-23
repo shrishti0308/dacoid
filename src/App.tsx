@@ -99,9 +99,48 @@ export default function App() {
     }
   }
 
+  const handleExportEventsJSON = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(events))
+    const downloadAnchorNode = document.createElement('a')
+    downloadAnchorNode.setAttribute("href", dataStr)
+    downloadAnchorNode.setAttribute("download", "events.json")
+    document.body.appendChild(downloadAnchorNode)
+    downloadAnchorNode.click()
+    downloadAnchorNode.remove()
+  }
+
+  const handleExportEventsCSV = () => {
+    const csvRows = [
+      ["ID", "Name", "Start Date", "Start Time", "End Date", "End Time", "Description", "Tag"],
+      ...events.map(event => [
+        event.id,
+        event.name,
+        new Date(event.startTime).toLocaleString(),
+        new Date(event.endTime).toLocaleString(),
+        event.description || "",
+        event.type || ""
+      ])
+    ]
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n")
+    const downloadAnchorNode = document.createElement('a')
+    downloadAnchorNode.setAttribute("href", csvContent)
+    downloadAnchorNode.setAttribute("download", "events.csv")
+    document.body.appendChild(downloadAnchorNode)
+    downloadAnchorNode.click()
+    downloadAnchorNode.remove()
+  }
+
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">Dynamic Event Calendar</h1>
+      <div className="flex justify-between">
+        <h1 className="text-3xl font-bold mb-4">Dynamic Event Calendar</h1>
+        <div className="flex space-x-4">
+
+      <Button onClick={handleExportEventsJSON}>Export JSON</Button>
+      <Button onClick={handleExportEventsCSV}>Export CSV</Button>
+        </div>
+      </div>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center space-x-4">
           <Button onClick={handlePrevMonth} variant="outline"><ChevronLeft className="h-4 w-4" /></Button>
