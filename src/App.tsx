@@ -46,10 +46,13 @@ export default function App() {
   }
 
   const handleEventClick = (event: Event) => {
+    const startTimeString = new Date(event.startTime).toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+    const endTimeString = new Date(event.endTime).toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+
     setEditingEvent({
       ...event,
-      startTime: new Date(event.startTime).toISOString().slice(0, 16),
-      endTime: new Date(event.endTime).toISOString().slice(0, 16)
+      startTime: `${startTimeString.slice(0, 10)}T${startTimeString.slice(12, 17)}`,
+      endTime: `${endTimeString.slice(0, 10)}T${endTimeString.slice(12, 17)}`
     })
     setIsDetailsModalOpen(true)
   }
