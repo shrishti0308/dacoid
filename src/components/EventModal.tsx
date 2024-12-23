@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useEffect, useState } from 'react'
-import { Event } from '../types/event'
+import { Event, EventType } from '../types/event'
 
 interface EventModalProps {
   isOpen: boolean
@@ -18,6 +19,7 @@ export default function EventModal({ isOpen, onClose, onSave, event, selectedDat
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [description, setDescription] = useState('')
+  const [type, setType] = useState<EventType>('other')
 
   useEffect(() => {
     if (event) {
@@ -25,13 +27,16 @@ export default function EventModal({ isOpen, onClose, onSave, event, selectedDat
       setStartTime(event.startTime)
       setEndTime(event.endTime)
       setDescription(event.description || '')
-    } else {
+      setType(event.type)
+    } else if (selectedDate) {
+      const dateString = selectedDate.toISOString().split('T')[0]
+      setStartTime(`${dateString}T09:00`)
+      setEndTime(`${dateString}T10:00`)
       setName('')
-      setStartTime('')
-      setEndTime('')
       setDescription('')
+      setType('other')
     }
-  }, [event])
+  }, [event, selectedDate])
 
   const handleSave = () => {
     const newEvent: Event = {
@@ -39,7 +44,8 @@ export default function EventModal({ isOpen, onClose, onSave, event, selectedDat
       name,
       startTime,
       endTime,
-      description
+      description,
+      type
     }
     onSave(newEvent)
   }
@@ -71,6 +77,16 @@ export default function EventModal({ isOpen, onClose, onSave, event, selectedDat
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
+          <Select value={type} onValueChange={(value: EventType) => setType(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select event type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="work">Work</SelectItem>
+              <SelectItem value="personal">Personal</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <DialogFooter>
           <Button onClick={handleSave}>Save</Button>
