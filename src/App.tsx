@@ -5,14 +5,16 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Calendar from './components/Calendar'
 import DayTimeline from './components/DayTimeline'
+import EventDetailsModal from './components/EventDetailsModal'
 import EventModal from './components/EventModal'
 import { Event } from './types/event'
 
 export default function App() {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [selectedDate, setSelectedDate] = useState(new Date())
   const [events, setEvents] = useState<Event[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<Event | null>(null)
 
   useEffect(() => {
@@ -39,9 +41,9 @@ export default function App() {
     setIsModalOpen(true)
   }
 
-  const handleEditEvent = (event: Event) => {
+  const handleEventClick = (event: Event) => {
     setEditingEvent(event)
-    setIsModalOpen(true)
+    setIsDetailsModalOpen(true)
   }
 
   const handleSaveEvent = (event: Event) => {
@@ -51,11 +53,14 @@ export default function App() {
       setEvents([...events, { ...event, id: Date.now().toString() }])
     }
     setIsModalOpen(false)
+    setIsDetailsModalOpen(false)
     setEditingEvent(null)
   }
 
   const handleDeleteEvent = (eventId: string) => {
     setEvents(events.filter(e => e.id !== eventId))
+    setIsDetailsModalOpen(false)
+    setEditingEvent(null)
   }
 
   const handleEventDrop = (result: any) => {
@@ -64,17 +69,36 @@ export default function App() {
     const updatedEvents = Array.from(events)
     const [reorderedEvent] = updatedEvents.splice(result.source.index, 1)
 
-    const newStartDate = new Date(result.destination.droppableId)
-    const oldStartDate = new Date(reorderedEvent.startTime)
-    const timeDiff = newStartDate.getTime() - oldStartDate.getTime()
+    if (result.type === "EVENT") {
+      // Dragging within the day timeline
+      const draggedMinutes = Math.round((result.destination.index - result.source.index) * 15)
+      const newStartTime = new Date(reorderedEvent.startTime)
+      newStartTime.setMinutes(newStartTime.getMinutes() + draggedMinutes)
+      const newEndTime = new Date(reorderedEvent.endTime)
+      newEndTime.setMinutes(newEndTime.getMinutes() + draggedMinutes)
 
-    const updatedEvent = {
-      ...reorderedEvent,
-      startTime: new Date(oldStartDate.getTime() + timeDiff).toISOString(),
-      endTime: new Date(new Date(reorderedEvent.endTime).getTime() + timeDiff).toISOString(),
+      const updatedEvent = {
+        ...reorderedEvent,
+        startTime: newStartTime.toISOString(),
+        endTime: newEndTime.toISOString(),
+      }
+
+      updatedEvents.splice(result.destination.index, 0, updatedEvent)
+    } else {
+      // Dragging between days in the calendar
+      const newStartDate = new Date(result.destination.droppableId)
+      const oldStartDate = new Date(reorderedEvent.startTime)
+      const timeDiff = newStartDate.getTime() - oldStartDate.getTime()
+
+      const updatedEvent = {
+        ...reorderedEvent,
+        startTime: new Date(oldStartDate.getTime() + timeDiff).toISOString(),
+        endTime: new Date(new Date(reorderedEvent.endTime).getTime() + timeDiff).toISOString(),
+      }
+
+      updatedEvents.splice(result.destination.index, 0, updatedEvent)
     }
 
-    updatedEvents.splice(result.destination.index, 0, updatedEvent)
     setEvents(updatedEvents)
   }
 
@@ -98,22 +122,28 @@ export default function App() {
           />
         </div>
         <div>
-          {selectedDate && (
-            <DayTimeline
-              date={selectedDate}
-              events={events.filter(event => new Date(event.startTime).toDateString() === selectedDate.toDateString())}
-              onEditEvent={handleEditEvent}
-              onDeleteEvent={handleDeleteEvent}
-            />
-          )}
+          <DayTimeline
+            date={selectedDate}
+            events={events.filter(event => new Date(event.startTime).toDateString() === selectedDate.toDateString())}
+            onEventClick={handleEventClick}
+            onEventDrop={handleEventDrop}
+            onDateChange={setSelectedDate}
+          />
         </div>
       </div>
       <EventModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveEvent}
-        event={editingEvent}
+        event={null}
         selectedDate={selectedDate}
+      />
+      <EventDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        onSave={handleSaveEvent}
+        onDelete={handleDeleteEvent}
+        event={editingEvent}
       />
     </div>
   )
