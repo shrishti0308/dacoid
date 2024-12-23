@@ -30,8 +30,9 @@ export default function EventModal({ isOpen, onClose, onSave, event, selectedDat
       setType(event.type)
     } else if (selectedDate) {
       const startDate = new Date(selectedDate)
-      startDate.setTime(new Date().getTime())
-
+      startDate.setHours(new Date().getHours())
+      startDate.setMinutes(new Date().getMinutes())
+      
       const startDateString = startDate.toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
       const startDateTime = `${startDateString.slice(0, 10)}T${startDateString.slice(12, 17)}`
 
