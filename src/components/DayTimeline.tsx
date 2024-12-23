@@ -1,19 +1,22 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useState } from 'react'
-import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd'
+import { useMemo, useState } from 'react'
 import { Event, getEventColor } from '../types/event'
 
 interface DayTimelineProps {
   date: Date
   events: Event[]
   onEventClick: (event: Event) => void
-  onEventDrop: (result: any) => void
   onDateChange: (date: Date) => void
 }
 
-export default function DayTimeline({ date, events, onEventClick, onEventDrop, onDateChange }: DayTimelineProps) {
+interface PositionedEvent extends Event {
+  width: number
+  left: number
+}
+
+export default function DayTimeline({ date, events, onEventClick, onDateChange }: DayTimelineProps) {
   const [filterKeyword, setFilterKeyword] = useState('')
 
   const filteredEvents = events.filter(event =>
@@ -35,6 +38,63 @@ export default function DayTimeline({ date, events, onEventClick, onEventDrop, o
     onDateChange(newDate)
   }
 
+  const positionedEvents = useMemo(() => {
+    const sortedEvents = [...filteredEvents].sort((a, b) =>
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    )
+
+    const positionedEvents: PositionedEvent[] = []
+    const columns: { endTime: number, column: number }[] = []
+
+    sortedEvents.forEach(event => {
+      const startTime = new Date(event.startTime).getTime()
+      const endTime = new Date(event.endTime).getTime()
+
+      // Find a suitable column
+      let column = 0
+      while (columns.some(col => col.endTime > startTime && col.column === column)) {
+        column++
+      }
+
+      // Update columns
+      columns.push({ endTime, column })
+
+      // Calculate max columns for this time slot
+      const overlappingColumns = columns.filter(col =>
+        col.endTime > startTime
+      ).length
+
+      positionedEvents.push({
+        ...event,
+        width: 95 / overlappingColumns,
+        left: (column * 95) / overlappingColumns,
+      })
+    })
+
+    return positionedEvents
+  }, [filteredEvents])
+
+  const getEventPosition = (event: PositionedEvent) => {
+    const startTime = new Date(event.startTime)
+    const endTime = new Date(event.endTime)
+
+    // Calculate minutes since start of day for both times
+    const startMinutes = startTime.getHours() * 60 + startTime.getMinutes()
+    const endMinutes = endTime.getHours() * 60 + endTime.getMinutes()
+
+    // Each hour slot is 80px (h-20 class), so multiply by (80/60) to get pixels per minute
+    const pixelsPerMinute = 80 / 60
+    const top = startMinutes * pixelsPerMinute
+    const height = (endMinutes - startMinutes) * pixelsPerMinute
+
+    return {
+      top: `${top}px`,
+      height: `${height}px`,
+      left: `${event.left}%`,
+      width: `${event.width}%`
+    }
+  }
+
   return (
     <div className="mt-4">
       <div className="flex justify-between items-center mb-4">
@@ -51,56 +111,40 @@ export default function DayTimeline({ date, events, onEventClick, onEventDrop, o
           className="w-full"
         />
       </div>
-      <DragDropContext onDragEnd={onEventDrop}>
-        <Droppable droppableId={date.toISOString()} type="EVENT">
-          {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps} className="relative h-[600px] overflow-y-auto">
-              {timeSlots.map(hour => (
-                <div key={hour} className="flex items-start h-20 border-t">
-                  <div className="w-16 text-right pr-2 text-sm text-gray-500">
-                    {hour.toString().padStart(2, '0')}:00
-                  </div>
-                  <div className="flex-1 relative">
-                    {filteredEvents
-                      .filter(event => new Date(event.startTime).getHours() === hour)
-                      .map((event, index) => {
-                        const startTime = new Date(event.startTime)
-                        const endTime = new Date(event.endTime)
-                        const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60)
-                        const height = `${(duration / 60) * 100}%`
-                        const top = `${(startTime.getMinutes() / 60) * 100}%`
-
-                        return (
-                          <Draggable key={event.id} draggableId={event.id} index={index}>
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className={`absolute left-0 right-0 p-1 text-xs ${getEventColor(event.type)} rounded overflow-hidden cursor-pointer`}
-                                style={{
-                                  top,
-                                  height,
-                                  minHeight: '20px',
-                                  ...provided.draggableProps.style
-                                }}
-                                onClick={() => onEventClick(event)}
-                              >
-                                <div className="font-bold">{event.name}</div>
-                                <div>{startTime.toLocaleTimeString()} - {endTime.toLocaleTimeString()}</div>
-                              </div>
-                            )}
-                          </Draggable>
-                        )
-                      })}
-                  </div>
-                </div>
-              ))}
-              {provided.placeholder}
+      <div className="relative h-[600px] overflow-y-auto border rounded-md">
+        <div className="absolute inset-0">
+          {timeSlots.map(hour => (
+            <div key={hour} className="flex items-start h-20 border-t">
+              <div className="w-16 text-right pr-2 text-sm text-muted-foreground py-1">
+                {hour.toString().padStart(2, '0')}:00
+              </div>
+              <div className="flex-1 relative border-l" />
             </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+          ))}
+          {positionedEvents.map((event) => {
+            const position = getEventPosition(event)
+            return (
+              <div
+                key={event.id}
+                className={`absolute p-2 rounded-md cursor-pointer transition-opacity hover:opacity-90 ${getEventColor(event.type)} border-l-4`}
+                style={{
+                  ...position,
+                  borderLeftColor: event.type === 'work' ? 'rgb(59, 130, 246)' :
+                                 event.type === 'personal' ? 'rgb(16, 185, 129)' :
+                                 'rgb(245, 158, 11)',
+                }}
+                onClick={() => onEventClick(event)}
+              >
+                <div className="font-medium text-sm">{event.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
+                  {new Date(event.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
